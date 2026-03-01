@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最強の〇×ゲームAI - ミニマックス法</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .info {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+
+        .player-info {
+            flex: 1;
+            padding: 15px;
+            border-radius: 10px;
+            background: #f0f0f0;
+        }
+
+        .player-info.active {
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+
+        .status {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+            min-height: 24px;
+            font-weight: bold;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .cell {
+            width: 100%;
+            aspect-ratio: 1;
+            font-size: 36px;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            background: #f0f0f0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cell:hover:not(:disabled) {
+            background: #e0e0e0;
+            transform: scale(1.05);
+        }
+
+        .cell:disabled {
+            cursor: not-allowed;
+        }
+
+        .cell.x {
+            color: #667eea;
+            background: #f0f0ff;
+        }
+
+        .cell.o {
+            color: #764ba2;
+            background: #f8f0ff;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button.btn-reset, button.btn-mode {
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button.btn-reset {
+            background: #667eea;
+            color: white;
+        }
+
+        button.btn-reset:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        button.btn-mode {
+            background: #764ba2;
+            color: white;
+        }
+
+        button.btn-mode:hover {
+            background: #653a89;
+            transform: translateY(-2px);
+        }
+
+        .stats {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 10px;
+            text-align: left;
+        }
+
+        .stats h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            color: #666;
+        }
+
+        .algorithm-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff3cd;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+            text-align: left;
+        }
+
+        .algorithm-info h4 {
+            color: #856404;
+            margin-bottom: 8px;
+        }
+
+        .algorithm-info p {
+            color: #856404;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .cell {
+                font-size: 28px;
+            }
+
+            button.btn-reset, button.btn-mode {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 最強の〇×ゲーム</h1>
+        <p class="subtitle">ミニマックス法で完璧なAIと対戦</p>
+
+        <div class="info">
+            <div class="player-info" id="playerXInfo">
+                <div>あなた (X)</div>
+                <div id="scoreX">0勝</div>
+            </div>
+            <div class="player-info" id="playerOInfo">
+                <div>AI (O)</div>
+                <div id="scoreO">0勝</div>
+            </div>
+        </div>
+
+        <div class="status" id="status">新しいゲームを開始しました</div>
+
+        <div class="board" id="board">
+            <button class="cell" data-index="0"></button>
+            <button class="cell" data-index="1"></button>
+            <button class="cell" data-index="2"></button>
+            <button class="cell" data-index="3"></button>
+            <button class="cell" data-index="4"></button>
+            <button class="cell" data-index="5"></button>
+            <button class="cell" data-index="6"></button>
+            <button class="cell" data-index="7"></button>
+            <button class="cell" data-index="8"></button>
+        </div>
+
+        <div class="buttons">
+            <button class="btn-reset" onclick="game.reset()">🔄 新しいゲーム</button>
+            <button class="btn-mode" onclick="game.toggleMode()">🤖 AIモード: <span id="modeText">困難</span></button>
+        </div>
+
+        <div class="stats">
+            <h3>📊 統計情報</h3>
+            <div class="stat-item">
+                <span>総ゲーム数:</span>
+                <span id="totalGames">0</span>
+            </div>
+            <div class="stat-item">
+                <span>あなたの勝利:</span>
+                <span id="playerWins">0</span>
+            </div>
+            <div class="stat-item">
+                <span>AIの勝利:</span>
+                <span id="aiWins">0</span>
+            </div>
+            <div class="stat-item">
+                <span>引き分け:</span>
+                <span id="draws">0</span>
+            </div>
+        </div>
+
+        <div class="algorithm-info">
+            <h4>🧠 ミニマックス法について</h4>
+            <p>
+                このAIは「ミニマックス法」という最強のアルゴリズムを使用しています。
+                すべての可能な手を探索し、最善の手を選ぶため、
+                このAIに勝つことはほぼ不可能です。最高で引き分けを目指してください！
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            board: ['', '', '', '', '', '', '', '', ''],
+            currentPlayer: 'X',
+            gameActive: true,
+            aiDifficulty: 'hard', // 'hard' or 'easy'
+            stats: {
+                totalGames: 0,
+                playerWins: 0,
+                aiWins: 0,
+                draws: 0
+            },
+
+            // ゲーム初期化
+            init() {
+                this.loadStats();
+                this.render();
+                this.attachEventListeners();
+            },
+
+            // イベントリスナー設定
+            attachEventListeners() {
+                document.querySelectorAll('.cell').forEach(cell => {
+                    cell.addEventListener('click', (e) => {
+                        const index = parseInt(e.target.dataset.index);
+                        this.handlePlayerMove(index);
+                    });
+                });
+            },
+
+            // プレイヤーの手を処理
+            handlePlayerMove(index) {
+                if (!this.gameActive || this.board[index] !== '' || this.currentPlayer !== 'X') {
+                    return;
+                }
+
+                this.board[index] = 'X';
+                this.render();
+
+                if (this.checkWinner('X')) {
+                    this.endGame('プレイヤー勝利! 🎉');
+                    this.stats.playerWins++;
+                    return;
+                }
+
+                if (this.isBoardFull()) {
+                    this.endGame('引き分け! 🤝');
+                    this.stats.draws++;
+                    return;
+                }
+
+                this.currentPlayer = 'O';
+                document.getElementById('status').textContent = 'AIが考え中...';
+                
+                // AIの手を遅延実行
+                setTimeout(() => this.aiMove(), 500);
+            },
+
+            // AI の手
+            aiMove() {
+                if (!this.gameActive) return;
+
+                const bestMove = this.aiDifficulty === 'hard'
+                    ? this.findBestMoveMinMax()
+                    : this.findRandomMove();
+
+                if (bestMove !== -1) {
+                    this.board[bestMove] = 'O';
+                    this.render();
+
+                    if (this.checkWinner('O')) {
+                        this.endGame('AIが勝利しました! 🤖');
+                        this.stats.aiWins++;
+                        return;
+                    }
+
+                    if (this.isBoardFull()) {
+                        this.endGame('引き分け! 🤝');
+                        this.stats.draws++;
+                        return;
+                    }
+                }
+
+                this.currentPlayer = 'X';
+                document.getElementById('status').textContent = 'あなたのターン (X)';
+            },
+
+            // ============================================
+            // ミニマックス法の実装
+            // ============================================
+            findBestMoveMinMax() {
+                let bestScore = -Infinity;
+                let bestMove = -1;
+
+                for (let i = 0; i < this.board.length; i++) {
+                    if (this.board[i] === '') {
+                        this.board[i] = 'O';
+                        const score = this.minimax(0, false);
+                        this.board[i] = '';
+
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestMove = i;
+                        }
+                    }
+                }
+
+                return bestMove;
+            },
+
+            // ミニマックスアルゴリズム
+            minimax(depth, isMaximizing) {
+                // ゲーム終了状態をチェック
+                if (this.checkWinner('O')) {
+                    return 10 - depth; // AIが勝つ状態
+                }
+                if (this.checkWinner('X')) {
+                    return depth - 10; // プレイヤーが勝つ状態
+                }
+                if (this.isBoardFull()) {
+                    return 0; // 引き分け
+                }
+
+                if (isMaximizing) {
+                    // AIのターン（最大化）
+                    let bestScore = -Infinity;
+                    for (let i = 0; i < this.board.length; i++) {
+                        if (this.board[i] === '') {
+                            this.board[i] = 'O';
+                            const score = this.minimax(depth + 1, false);
+                            this.board[i] = '';
+                            bestScore = Math.max(score, bestScore);
+                        }
+                    }
+                    return bestScore;
+                } else {
+                    // プレイヤーのターン（最小化）
+                    let bestScore = Infinity;
+                    for (let i = 0; i < this.board.length; i++) {
+                        if (this.board[i] === '') {
+                            this.board[i] = 'X';
+                            const score = this.minimax(depth + 1, true);
+                            this.board[i] = '';
+                            bestScore = Math.min(score, bestScore);
+                        }
+                    }
+                    return bestScore;
+                }
+            }
+            // ============================================
+
+            // ランダムな手を見つける（イージーモード）
+            findRandomMove() {
+                const emptyIndices = this.board
+                    .map((cell, index) => cell === '' ? index : -1)
+                    .filter(index => index !== -1);
+                return emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+            },
+
+            // 勝者をチェック
+            checkWinner(player) {
+                const winPatterns = [
+                    [0, 1, 2],
+                    [3, 4, 5],
+                    [6, 7, 8],
+                    [0, 3, 6],
+                    [1, 4, 7],
+                    [2, 5, 8],
+                    [0, 4, 8],
+                    [2, 4, 6]
+                ];
+
+                return winPatterns.some(pattern =>
+                    pattern.every(index => this.board[index] === player)
+                );
+            },
+
+            // ボードが満杯かチェック
+            isBoardFull() {
+                return this.board.every(cell => cell !== '');
+            },
+
+            // ゲーム終了
+            endGame(message) {
+                this.gameActive = false;
+                document.getElementById('status').textContent = message;
+                this.stats.totalGames++;
+                this.saveStats();
+                this.updateStatsDisplay();
+            },
+
+            // ボードをリセット
+            reset() {
+                this.board = ['', '', '', '', '', '', '', '', ''];
+                this.currentPlayer = 'X';
+                this.gameActive = true;
+                document.getElementById('status').textContent = 'あなたのターン (X)';
+                this.render();
+            },
+
+            // AIの難易度をトグル
+            toggleMode() {
+                this.aiDifficulty = this.aiDifficulty === 'hard' ? 'easy' : 'hard';
+                document.getElementById('modeText').textContent = 
+                    this.aiDifficulty === 'hard' ? '困難' : '簡単';
+                this.reset();
+            },
+
+            // UI をレンダリング
+            render() {
+                const cells = document.querySelectorAll('.cell');
+                cells.forEach((cell, index) => {
+                    cell.textContent = this.board[index];
+                    cell.className = 'cell';
+                    if (this.board[index] === 'X') {
+                        cell.classList.add('x');
+                        cell.disabled = true;
+                    } else if (this.board[index] === 'O') {
+                        cell.classList.add('o');
+                        cell.disabled = true;
+                    }
+                    if (!this.gameActive) {
+                        cell.disabled = true;
+                    }
+                });
+
+                // プレイヤーインフォを更新
+                document.getElementById('playerXInfo').classList.toggle('active', this.currentPlayer === 'X' && this.gameActive);
+                document.getElementById('playerOInfo').classList.toggle('active', this.currentPlayer === 'O' && this.gameActive);
+            },
+
+            // 統計情報を保存
+            saveStats() {
+                localStorage.setItem('ticTacToeStats', JSON.stringify(this.stats));
+            },
+
+            // 統計情報を読み込み
+            loadStats() {
+                const saved = localStorage.getItem('ticTacToeStats');
+                if (saved) {
+                    this.stats = JSON.parse(saved);
+                    this.updateStatsDisplay();
+                }
+            },
+
+            // 統計情報を更新表示
+            updateStatsDisplay() {
+                document.getElementById('totalGames').textContent = this.stats.totalGames;
+                document.getElementById('playerWins').textContent = this.stats.playerWins;
+                document.getElementById('aiWins').textContent = this.stats.aiWins;
+                document.getElementById('draws').textContent = this.stats.draws;
+                document.getElementById('scoreX').textContent = `${this.stats.playerWins}勝`;
+                document.getElementById('scoreO').textContent = `${this.stats.aiWins}勝`;
+            }
+        };
+
+        // ゲーム開始
+        game.init();
+    </script>
+</body>
+</html>
